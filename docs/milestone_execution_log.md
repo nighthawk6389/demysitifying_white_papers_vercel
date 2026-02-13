@@ -44,15 +44,59 @@ This document is updated as implementation progresses. For each milestone, imple
 ## M3 — Interactive Understanding Tools
 
 ### Pre-start implementation details
-_To be filled in immediately before implementation starts._
+- Scope for this iteration:
+  1. Add a guided reading mode with segment-by-segment prompts and reader progression controls.
+  2. Add in-app knowledge checks with immediate correctness feedback.
+  3. Add progressive simplification controls so a selected equation step can be rewritten in plain vs technical modes.
+  4. Extend tests to validate guided reading and knowledge-check behavior.
+- Out of scope for this iteration:
+  - Adaptive spaced repetition
+  - User profile persistence for quiz performance
+  - PDF-aware auto-generated learning checks
 
 ### Execution updates
-_Not started._
+- ✅ Added `readingSegments` and navigation UI for guided reading mode.
+- ✅ Added `knowledgeChecks` with answer selection and rationale feedback.
+- ✅ Added simplification controls (`plain` / `technical`) tied to selected equation step context.
+- ✅ Expanded Vitest coverage for guided progression and correctness feedback.
 
 ## M4 — Integrations + Quality Hardening
 
 ### Pre-start implementation details
-_To be filled in immediately before implementation starts._
+- Scope for this iteration:
+  1. Add Wolfram Alpha launcher hook with prefilled query from current equation + selected symbol.
+  2. Add optional model-backed Q&A assistant stub with explicit confidence + caveat wording.
+  3. Add explanation guardrails display to surface grounding checks.
+  4. Add explanation helpfulness feedback controls (thumbs up/down stub).
+  5. Validate against a sample ACM paper URL in helper workflow notes for future parser handoff.
+- Out of scope for this iteration:
+  - Real Wolfram/API credentials
+  - Real retrieval-backed assistant
+  - Automated explanation evaluator service
 
 ### Execution updates
-_Not started._
+- ✅ Added `buildWolframQuery` helper and UI link to Wolfram Alpha with prefilled query text.
+- ✅ Added Q&A assistant stub with grounded response text, confidence label, and caveat.
+- ✅ Added guardrail checks list (`evaluateGrounding`) in explain-selection modal.
+- ✅ Added helpfulness feedback controls and stub persistence message in modal.
+- ✅ Added tests validating integration link generation and Q&A caveat/confidence behavior.
+
+
+## Post-M4 Completion Pass — Upload + Explainability Hardening
+
+### Pre-start implementation details
+- Scope for this pass:
+  1. Implement real document upload flow so users can load research files directly from the UI.
+  2. Parse uploaded `.txt/.md/.pdf` files into explainable structures (title, context, equation, symbols, guided segments).
+  3. Keep explanation workflows grounded against uploaded content rather than only static sample data.
+  4. Add integration-style tests for upload flow and parser behavior.
+- Out of scope for this pass:
+  - Full backend retrieval pipeline
+  - OCR for scanned-image PDFs
+  - Production model-serving endpoint
+
+### Execution updates
+- ✅ Added `parseResearchDocument` pipeline with PDF text extraction (`pdfjs-dist`) and text-file parsing fallback.
+- ✅ Wired upload control into app header and switched reader state to use uploaded paper context.
+- ✅ Kept explanation payloads, guided reading, and tool integrations grounded to the uploaded paper state.
+- ✅ Added integration tests for upload flow and parser output shape validation.

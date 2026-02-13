@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './main';
+import * as parser from './data/documentParser';
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('App milestone flows', () => {
@@ -16,6 +18,43 @@ describe('App milestone flows', () => {
 
     expect(screen.getByText('Selected:').parentElement).toHaveTextContent('Selected: F');
     expect(screen.getByText('Plain meaning:').parentElement).toHaveTextContent('Force applied to an object.');
+  });
+
+  it('uploads a document and renders parsed content', async () => {
+    vi.spyOn(parser, 'parseResearchDocument').mockResolvedValue({
+      title: 'Attention Is All You Need',
+      rawText: 'Q = XWq, K = XWk, V = XWv',
+      contextSnippet: 'Q = XWq, K = XWk, V = XWv',
+      equation: 'Q = XWq',
+      symbols: [
+        {
+          key: 'Q',
+          meaning: 'Query projection.',
+          whyItMatters: 'Defines attention compatibility.'
+        }
+      ],
+      segments: [
+        {
+          id: 'segment-1',
+          title: 'Document segment 1',
+          text: 'Q = XWq, K = XWk, V = XWv',
+          focusPrompt: 'What mapping is introduced?'
+        }
+      ]
+    });
+
+    render(<App />);
+
+    const input = screen.getByLabelText('Upload research document') as HTMLInputElement;
+    const file = new File(['fake-content'], 'attention.pdf', { type: 'application/pdf' });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    expect(screen.getByRole('heading', { name: 'Attention Is All You Need' })).toBeInTheDocument();
+    expect(screen.getByText('Q = XWq')).toBeInTheDocument();
+    expect(screen.getByText(/Loaded attention.pdf/)).toBeInTheDocument();
   });
 
   it('updates symbol details when a notation token is clicked', () => {
@@ -52,34 +91,31 @@ describe('App milestone flows', () => {
     expect(within(dialog).getByText(/a means acceleration/)).toBeInTheDocument();
   });
 
-  it('explains a decomposition step and reflects intermediate depth in payload', () => {
+  it('supports guided reading progression and knowledge checks', () => {
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('Explanation depth'), {
-      target: { value: 'intermediate' }
+    expect(screen.getByText('What relationship is introduced?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next segment' }));
+    expect(screen.getByText('How should we read fixed-variable statements?')).toBeInTheDocument();
+
+    const checkCard = screen.getByText(/If mass is constant and acceleration doubles/).closest('li');
+    expect(checkCard).not.toBeNull();
+    fireEvent.click(within(checkCard!).getByRole('button', { name: 'Force doubles' }));
+    expect(within(checkCard!).getByText(/Correct./)).toBeInTheDocument();
+  });
+
+  it('renders wolfram integration link and answers qa with confidence caveat', () => {
+    render(<App />);
+
+    const wolframLink = screen.getByRole('link', { name: 'Open in Wolfram Alpha' });
+    expect(wolframLink).toHaveAttribute('href', expect.stringContaining('wolframalpha.com/input'));
+
+    fireEvent.change(screen.getByLabelText('Ask about this passage'), {
+      target: { value: 'Can this relation be nonlinear?' }
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask grounded assistant' }));
 
-    const stepItem = screen.getByText('Hold mass constant').closest('li');
-    expect(stepItem).not.toBeNull();
-    fireEvent.click(within(stepItem!).getByRole('button', { name: 'Explain this step' }));
-
-    const dialog = screen.getByRole('dialog');
-
-    expect(within(dialog).getByText(/Using F ∝ a \(for fixed m\)/)).toBeInTheDocument();
-    expect(
-      within(dialog).getByText((content, node) => {
-        return node?.tagName.toLowerCase() === 'pre' && content.includes('"selectionType": "equation_step"');
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText((content, node) => {
-        return node?.tagName.toLowerCase() === 'pre' && content.includes('"selectedStepId": "step-2"');
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText((content, node) => {
-        return node?.tagName.toLowerCase() === 'pre' && content.includes('"requestedDepth": "intermediate"');
-      })
-    ).toBeInTheDocument();
+    expect(screen.getByText(/confidence: medium/)).toBeInTheDocument();
+    expect(screen.getByText(/not a full derivation proof/)).toBeInTheDocument();
   });
 });

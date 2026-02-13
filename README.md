@@ -11,7 +11,15 @@ The goal is to make research notation and concepts approachable through:
 - Integrations to external helpers (e.g., Wolfram Alpha)
 - Optional LLM-backed explanation support for difficult passages
 
-This repository currently contains a **framework-based MVP skeleton** so we can iterate quickly on product details.
+This repository now includes an MVP upload-and-explain flow: users can upload a text or digital PDF research document and inspect extracted symbols, guided segments, and explanation stubs.
+
+
+## Current capabilities
+
+- Upload `.pdf`, `.txt`, or `.md` research documents from the top bar
+- Extract a context snippet, draft equation, notation tokens, and guided reading segments
+- Run local explain-selection/Q&A stubs grounded to uploaded content
+- Launch prefilled Wolfram Alpha queries from selected notation
 
 ## Practicality review (updated)
 
@@ -52,13 +60,10 @@ To keep this realistic and useful early, we should optimize for:
 - "Explain like I'm new to this" depth toggle
 - Inline "Was this explanation helpful?" feedback loop
 
-<<<<<<< codex/create-skeleton-for-math-visualization-web-app
 ## Milestone tracking
 
 Detailed implementation tracking lives in `docs/milestone_execution_log.md` and is updated as milestone work starts/completes.
 
-=======
->>>>>>> main
 ## Run the skeleton locally
 
 ```bash
