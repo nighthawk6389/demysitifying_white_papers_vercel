@@ -1,4 +1,4 @@
-# Demystifying White Papers
+# Demystifying White Papers 
 
 A lightweight web app skeleton for helping non-specialists understand dense math/physics/ML research papers.
 
