@@ -1,3 +1,4 @@
+<<<<<<< codex/create-skeleton-for-math-visualization-web-app
 import { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
@@ -58,6 +59,15 @@ function App() {
     setSelectedStep(null);
     setSelectedSymbolKey(symbolKey);
   }
+=======
+import { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
+
+function App() {
+  const [showNotation, setShowNotation] = useState(false);
+  const [showLlm, setShowLlm] = useState(false);
+>>>>>>> main
 
   return (
     <>
@@ -69,6 +79,7 @@ function App() {
       <main className="layout">
         <section className="reader">
           <h2>Interactive Reader Skeleton</h2>
+<<<<<<< codex/create-skeleton-for-math-visualization-web-app
           <p>{samplePaper.contextSnippet}</p>
 
           <article className="card">
@@ -137,6 +148,29 @@ function App() {
             <p>No symbols available in this paper.</p>
           )}
 
+=======
+          <p>
+            Goal: Help non-PhD readers understand notation and derivations with
+            clickable explanations.
+          </p>
+
+          <article className="card">
+            <h3>Sample Equation</h3>
+            <p className="equation">{'\\( F = m \\cdot a \\)'}</p>
+            <p>
+              Click on a notation token to see beginner-friendly context:{' '}
+              <button className="token" onClick={() => setShowNotation(true)}>
+                m
+              </button>
+            </p>
+            <button className="primary" onClick={() => setShowLlm(true)}>
+              Explain this equation (LLM stub)
+            </button>
+          </article>
+        </section>
+
+        <aside className="sidebar">
+>>>>>>> main
           <h3>Connected Tools (Planned)</h3>
           <ul>
             <li>Wolfram Alpha query launcher</li>
@@ -148,6 +182,7 @@ function App() {
         </aside>
       </main>
 
+<<<<<<< codex/create-skeleton-for-math-visualization-web-app
       {showLlm && (
         <dialog open className="modal">
           <h4>LLM Explain-selection Stub</h4>
@@ -155,6 +190,36 @@ function App() {
           <pre>{JSON.stringify(llmPayloadPreview, null, 2)}</pre>
           <p className="note">Simulated model output:</p>
           <p>{llmOutput}</p>
+=======
+      {showNotation && (
+        <dialog open className="modal">
+          <h4>Notation: m</h4>
+          <p>
+            <strong>Plain meaning:</strong> mass, or “how much matter is in an
+            object.”
+          </p>
+          <p>
+            <strong>Why it matters here:</strong> larger mass means more force
+            required for the same acceleration.
+          </p>
+          <button onClick={() => setShowNotation(false)}>Close</button>
+        </dialog>
+      )}
+
+      {showLlm && (
+        <dialog open className="modal">
+          <h4>LLM Explanation (Stub)</h4>
+          <p>
+            In plain language: this equation says force grows when either mass
+            or acceleration grows. For the same acceleration, heavier objects
+            need more force.
+          </p>
+          <p className="note">
+            Future M1/M2 behavior: send selected equation + surrounding paper
+            context to an LLM service, then return a grounded step-by-step
+            explanation.
+          </p>
+>>>>>>> main
           <button onClick={() => setShowLlm(false)}>Close</button>
         </dialog>
       )}

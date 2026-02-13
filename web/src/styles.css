@@ -85,6 +85,7 @@ body {
   color: #334155;
 }
 
+
 .token,
 .ghost,
 .primary,
@@ -98,22 +99,16 @@ body {
 
 .primary {
   margin-top: 0.25rem;
+
 }
 
 .modal {
   border: 1px solid #bfdbfe;
   border-radius: 10px;
-  max-width: 560px;
+  max-width: 460px;
 }
 
 .note {
   color: #334155;
   font-size: 0.95rem;
-}
-
-pre {
-  background: #f1f5f9;
-  border-radius: 8px;
-  padding: 0.75rem;
-  white-space: pre-wrap;
 }
