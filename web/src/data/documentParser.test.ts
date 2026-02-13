@@ -1,26 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { parseResearchDocument } from './documentParser';
+import { describe, expect, it, vi } from 'vitest';
+import { parseResearchDocumentFromUrl } from './documentParser';
 
-describe('parseResearchDocument', () => {
-  it('parses plain text file into explainable structures', async () => {
-    const text = [
-      'Neural Computation Notes',
-      'We define y = Wx + b as a linear mapping.',
-      'If x grows while W is fixed, y scales proportionally.'
-    ].join('\n');
+describe('parseResearchDocumentFromUrl', () => {
+  it('extracts formula spans from equation-style lines and latex delimiters', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'text/plain' },
+        text: async () => 'Test Paper\nWe define $y = Wx + b$ and later show z = y^2 + 1.'
+      })
+    );
 
-    const file = {
-      name: 'linear-notes.txt',
-      type: 'text/plain',
-      text: async () => text
-    } as File;
+    const parsed = await parseResearchDocumentFromUrl('https://example.com/paper.txt');
 
-    const parsed = await parseResearchDocument(file);
-
-    expect(parsed.title).toContain('linear-notes');
-    expect(parsed.equation).toContain('y = Wx + b');
-    expect(parsed.symbols.length).toBeGreaterThan(0);
-    expect(parsed.segments.length).toBeGreaterThan(0);
-    expect(parsed.contextSnippet.length).toBeGreaterThan(0);
+    expect(parsed.title).toContain('Test Paper');
+    expect(parsed.formulas.length).toBeGreaterThan(0);
+    expect(parsed.formulas.some((item) => item.expression.includes('y = Wx + b'))).toBe(true);
   });
 });
