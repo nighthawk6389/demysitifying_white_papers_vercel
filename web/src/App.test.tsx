@@ -14,7 +14,8 @@ describe('App milestone flows', () => {
 
     expect(screen.getByRole('heading', { name: 'Demystifying White Papers' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Newtonian Dynamics Primer' })).toBeInTheDocument();
-    expect(screen.getAllByText('F = m · a').length).toBeGreaterThan(0);
+    // Equation text may be rendered by KaTeX or as raw text fallback
+    expect(screen.getByText(/F\s*=\s*m/)).toBeInTheDocument();
 
     expect(screen.getByText('Selected:').parentElement).toHaveTextContent('Selected: F');
     expect(screen.getByText('Plain meaning:').parentElement).toHaveTextContent('Force applied to an object.');
@@ -26,6 +27,7 @@ describe('App milestone flows', () => {
       rawText: 'Q = XWq, K = XWk, V = XWv',
       contextSnippet: 'Q = XWq, K = XWk, V = XWv',
       equation: 'Q = XWq',
+      equations: ['Q = XWq', 'K = XWk', 'V = XWv'],
       symbols: [
         {
           key: 'Q',
@@ -53,7 +55,8 @@ describe('App milestone flows', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Attention Is All You Need' })).toBeInTheDocument();
-    expect(screen.getByText('Q = XWq')).toBeInTheDocument();
+    // Equation may be rendered by KaTeX or shown as raw text
+    expect(screen.getByText(/Q\s*=\s*XWq/)).toBeInTheDocument();
     expect(screen.getByText(/Loaded attention.pdf/)).toBeInTheDocument();
   });
 

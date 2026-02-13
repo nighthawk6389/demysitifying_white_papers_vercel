@@ -1,6 +1,8 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { createRoot } from 'react-dom/client';
+import 'katex/dist/katex.min.css';
 import './styles.css';
+import katex from 'katex';
 import { samplePaper, type PaperSymbol } from './data/samplePaper';
 import {
   buildStepExplanation,
@@ -22,9 +24,33 @@ type UploadedPaper = {
   title: string;
   contextSnippet: string;
   equation: string;
+  equations: string[];
   symbols: PaperSymbol[];
   segments: Array<{ id: string; title: string; text: string; focusPrompt: string }>;
 };
+
+/** Renders a math expression using KaTeX, falling back to plain text on error */
+function MathDisplay({ expression, displayMode = true }: { expression: string; displayMode?: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    try {
+      katex.render(expression, node, {
+        displayMode,
+        throwOnError: false,
+        trust: true,
+        strict: false,
+        output: 'html',
+      });
+    } catch {
+      node.textContent = expression;
+    }
+  }, [expression, displayMode]);
+
+  return <div ref={containerRef} className={`math-display ${displayMode ? 'math-block' : 'math-inline'}`} />;
+}
 
 export function App() {
   const [uploadedPaper, setUploadedPaper] = useState<UploadedPaper | null>(null);
@@ -45,6 +71,7 @@ export function App() {
     title: samplePaper.title,
     contextSnippet: samplePaper.contextSnippet,
     equation: samplePaper.equation,
+    equations: [samplePaper.equation],
     symbols: samplePaper.symbols,
     segments: readingSegments
   };
@@ -86,12 +113,15 @@ export function App() {
         title: parsed.title,
         contextSnippet: parsed.contextSnippet,
         equation: parsed.equation,
+        equations: parsed.equations,
         symbols: parsed.symbols,
         segments: parsed.segments
       });
       setSelectedSymbolKey(parsed.symbols[0]?.key ?? '');
       setActiveSegmentIndex(0);
-      setUploadStatus(`Loaded ${file.name}. Parsed ${parsed.segments.length} segments and ${parsed.symbols.length} symbols.`);
+      setUploadStatus(
+        `Loaded ${file.name}. Found ${parsed.equations.length} equation(s), ${parsed.segments.length} segments, and ${parsed.symbols.length} symbols.`
+      );
     } catch (error) {
       setUploadStatus(`Failed to parse ${file.name}. ${(error as Error).message}`);
     }
@@ -166,7 +196,15 @@ export function App() {
 
           <article className="card">
             <h3>{currentPaper.title}</h3>
-            <p className="equation">{currentPaper.equation}</p>
+            <div className="equations-container">
+              <h4>Extracted Equations ({currentPaper.equations.length})</h4>
+              {currentPaper.equations.map((eq, i) => (
+                <div key={`${eq}-${i}`} className="equation-item">
+                  <MathDisplay expression={eq} displayMode />
+                  <p className="equation-raw">{eq}</p>
+                </div>
+              ))}
+            </div>
             <p>Click on a notation token to inspect it in context:</p>
             <div className="token-row">
               {currentPaper.symbols.map((symbol) => (
