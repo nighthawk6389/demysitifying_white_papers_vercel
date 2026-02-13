@@ -14,6 +14,12 @@ export type ParsedDocument = {
   formulas: FormulaSpan[];
 };
 
+type PdfTextLine = {
+  y: number;
+  x: number;
+  text: string;
+};
+
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
@@ -64,7 +70,8 @@ function collectFormulas(text: string): FormulaSpan[] {
     }
   }
 
-  for (const match of text.matchAll(/(?:^|\n)\s*([A-Za-z0-9_\\α-ωΑ-Ω\[\]\(\)\s+\-*/^.,]{3,220}=[^\n]{2,220})/g)) {
+  const lineRegex = /^\s*([A-Za-z0-9_\\α-ωΑ-Ω\[\]\(\){}⟨⟩| +\-*/^.,:≤≥<>≈∝√ΣΠ∫∞]+=[^\n]{2,220})\s*$/gm;
+  for (const match of text.matchAll(lineRegex)) {
     if (match.index !== undefined) {
       pushMatch(match[1] ?? '', match.index, 'equation-line');
     }
@@ -90,6 +97,76 @@ async function readTextFile(file: File): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
+function toPdfTextLine(item: unknown): PdfTextLine | null {
+  if (!item || typeof item !== 'object' || !('str' in item) || !('transform' in item)) {
+    return null;
+  }
+
+  const text = typeof item.str === 'string' ? item.str : '';
+  const transform = Array.isArray(item.transform) ? item.transform : null;
+  if (!text || !transform || transform.length < 6) {
+    return null;
+  }
+
+  const x = typeof transform[4] === 'number' ? transform[4] : 0;
+  const y = typeof transform[5] === 'number' ? transform[5] : 0;
+
+  return { text, x, y };
+}
+
+function toLayoutAwarePageText(items: unknown[]): string {
+  const lines = items
+    .map(toPdfTextLine)
+    .filter((line): line is PdfTextLine => line !== null)
+    .sort((a, b) => {
+      const yDiff = Math.abs(b.y - a.y);
+      if (yDiff > 2) {
+        return b.y - a.y;
+      }
+
+      return a.x - b.x;
+    });
+
+  const mergedLines: string[] = [];
+  let bucketY: number | null = null;
+  let bucket: PdfTextLine[] = [];
+
+  const flushBucket = () => {
+    if (bucket.length === 0) {
+      return;
+    }
+
+    const text = bucket
+      .sort((a, b) => a.x - b.x)
+      .map((line) => line.text)
+      .join(' ')
+      .replace(/\s+([,.;:!?\)\]])/g, '$1')
+      .replace(/([\(\[] )/g, '$1')
+      .trim();
+
+    if (text) {
+      mergedLines.push(text);
+    }
+
+    bucket = [];
+  };
+
+  for (const line of lines) {
+    if (bucketY === null || Math.abs(bucketY - line.y) <= 2) {
+      bucketY = bucketY === null ? line.y : bucketY;
+      bucket.push(line);
+      continue;
+    }
+
+    flushBucket();
+    bucketY = line.y;
+    bucket.push(line);
+  }
+
+  flushBucket();
+  return mergedLines.join('\n');
+}
+
 async function extractPdfTextFromBuffer(bytes: ArrayBuffer): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
@@ -98,23 +175,22 @@ async function extractPdfTextFromBuffer(bytes: ArrayBuffer): Promise<string> {
   const doc = await loadingTask.promise;
 
   const pageTexts: string[] = [];
-  const maxPages = Math.min(doc.numPages, 12);
 
-  for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
+  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
     const page = await doc.getPage(pageNumber);
     const content = await page.getTextContent();
-    const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
-    pageTexts.push(text);
+    const pageText = toLayoutAwarePageText(content.items as unknown[]);
+    pageTexts.push(pageText);
   }
 
-  return pageTexts.join('\n');
+  return pageTexts.join('\n\n');
 }
 
 async function fetchDocumentTextFromUrl(url: string): Promise<string> {
   const direct = await fetch(url);
   if (direct.ok) {
     const contentType = direct.headers.get('content-type') ?? '';
-    if (contentType.includes('application/pdf')) {
+    if (contentType.includes('application/pdf') || url.toLowerCase().endsWith('.pdf')) {
       const bytes = await direct.arrayBuffer();
       return extractPdfTextFromBuffer(bytes);
     }
@@ -143,6 +219,11 @@ function toParsedDocument(rawText: string, sourceName: string, sourceUrl?: strin
   };
 }
 
+
+export const documentParserInternals = {
+  collectFormulas,
+  toLayoutAwarePageText
+};
 export async function parseResearchDocument(file: File): Promise<ParsedDocument> {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   const rawText = isPdf ? await extractPdfTextFromBuffer(await file.arrayBuffer()) : await readTextFile(file);
