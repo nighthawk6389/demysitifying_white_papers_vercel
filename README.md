@@ -64,7 +64,14 @@ To keep this realistic and useful early, we should optimize for:
 
 Detailed implementation tracking lives in `docs/milestone_execution_log.md` and is updated as milestone work starts/completes.
 
-## Run the skeleton locally
+## Build and run documentation
+
+See `docs/build_and_run.md` for:
+- local development and production build commands
+- Vercel deployment settings
+- a specific fix for first-launch 404 issues (root/output/rewrite configuration)
+
+Quick start:
 
 ```bash
 cd web
