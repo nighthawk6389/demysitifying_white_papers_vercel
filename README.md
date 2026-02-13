@@ -52,6 +52,13 @@ To keep this realistic and useful early, we should optimize for:
 - "Explain like I'm new to this" depth toggle
 - Inline "Was this explanation helpful?" feedback loop
 
+<<<<<<< codex/create-skeleton-for-math-visualization-web-app
+## Milestone tracking
+
+Detailed implementation tracking lives in `docs/milestone_execution_log.md` and is updated as milestone work starts/completes.
+
+=======
+>>>>>>> main
 ## Run the skeleton locally
 
 ```bash
