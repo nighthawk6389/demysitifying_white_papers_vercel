@@ -1,21 +1,37 @@
-import { describe, expect, it, vi } from 'vitest';
-import { parseResearchDocumentFromUrl } from './documentParser';
+import { describe, expect, it } from 'vitest';
+import { documentParserInternals } from './documentParser';
 
-describe('parseResearchDocumentFromUrl', () => {
-  it('extracts formula spans from equation-style lines and latex delimiters', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: { get: () => 'text/plain' },
-        text: async () => 'Test Paper\nWe define $y = Wx + b$ and later show z = y^2 + 1.'
-      })
-    );
+describe('documentParserInternals', () => {
+  it('extracts equation-like lines while deduplicating exact matches', () => {
+    const text = [
+      'Intro text',
+      'y = Wx + b',
+      'y = Wx + b',
+      `$$
+L = -\\sum_i y_i log(p_i)
+$$`
+    ].join('\n');
 
-    const parsed = await parseResearchDocumentFromUrl('https://example.com/paper.txt');
+    const formulas = documentParserInternals.collectFormulas(text);
 
-    expect(parsed.title).toContain('Test Paper');
-    expect(parsed.formulas.length).toBeGreaterThan(0);
-    expect(parsed.formulas.some((item) => item.expression.includes('y = Wx + b'))).toBe(true);
+    expect(formulas.map((formula) => formula.expression)).toEqual([
+      'L = -\\sum_i y_i log(p_i)',
+      'y = Wx + b'
+    ]);
+  });
+
+  it('reconstructs text with line breaks using y positions', () => {
+    const pageText = documentParserInternals.toLayoutAwarePageText([
+      { str: 'y', transform: [1, 0, 0, 1, 10, 100] },
+      { str: '=', transform: [1, 0, 0, 1, 20, 100] },
+      { str: 'Wx', transform: [1, 0, 0, 1, 30, 100] },
+      { str: '+', transform: [1, 0, 0, 1, 45, 100] },
+      { str: 'b', transform: [1, 0, 0, 1, 55, 100] },
+      { str: 'L', transform: [1, 0, 0, 1, 10, 90] },
+      { str: '=', transform: [1, 0, 0, 1, 20, 90] },
+      { str: '0', transform: [1, 0, 0, 1, 30, 90] }
+    ]);
+
+    expect(pageText).toBe('y = Wx + b\nL = 0');
   });
 });
