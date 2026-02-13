@@ -5,22 +5,22 @@ import { samplePaper } from './data/samplePaper';
 import { buildStepExplanation, equationSteps, type EquationStep, type ExplanationDepth } from './data/explainability';
 
 function App() {
-  const [selectedSymbolKey, setSelectedSymbolKey] = useState(samplePaper.symbols[1].key);
+  const [selectedSymbolKey, setSelectedSymbolKey] = useState(samplePaper.symbols[0]?.key ?? '');
   const [selectedStep, setSelectedStep] = useState<EquationStep | null>(null);
   const [explanationDepth, setExplanationDepth] = useState<ExplanationDepth>('beginner');
   const [showLlm, setShowLlm] = useState(false);
   const [llmOutput, setLlmOutput] = useState('');
 
-  const selectedSymbol = useMemo(
-    () => samplePaper.symbols.find((symbol) => symbol.key === selectedSymbolKey) ?? samplePaper.symbols[0],
-    [selectedSymbolKey]
-  );
+  const selectedSymbol = useMemo(() => {
+    const fallbackSymbol = samplePaper.symbols[0];
+    return samplePaper.symbols.find((symbol) => symbol.key === selectedSymbolKey) ?? fallbackSymbol;
+  }, [selectedSymbolKey]);
 
   const llmPayloadPreview = useMemo(
     () => ({
       paperTitle: samplePaper.title,
       selectionType: selectedStep ? 'equation_step' : 'symbol',
-      selectedSymbol: selectedSymbol.key,
+      selectedSymbol: selectedSymbol?.key ?? null,
       selectedStepId: selectedStep?.id ?? null,
       equation: samplePaper.equation,
       localContext: samplePaper.contextSnippet,
@@ -30,6 +30,12 @@ function App() {
   );
 
   function runSelectionStub() {
+    if (!selectedSymbol) {
+      setLlmOutput('No symbol is available to explain.');
+      setShowLlm(true);
+      return;
+    }
+
     setLlmOutput('Generating explanation...');
     setShowLlm(true);
 
@@ -46,6 +52,11 @@ function App() {
     setSelectedStep(step);
     setLlmOutput(buildStepExplanation(step, explanationDepth));
     setShowLlm(true);
+  }
+
+  function handleSymbolClick(symbolKey: string) {
+    setSelectedStep(null);
+    setSelectedSymbolKey(symbolKey);
   }
 
   return (
@@ -66,7 +77,7 @@ function App() {
             <p>Click on a notation token to inspect it in context:</p>
             <div className="token-row">
               {samplePaper.symbols.map((symbol) => (
-                <button key={symbol.key} className="token" onClick={() => setSelectedSymbolKey(symbol.key)}>
+                <button key={symbol.key} className="token" onClick={() => handleSymbolClick(symbol.key)}>
                   {symbol.key}
                 </button>
               ))}
@@ -110,15 +121,21 @@ function App() {
 
         <aside className="sidebar">
           <h3>Symbol details</h3>
-          <p>
-            <strong>Selected:</strong> {selectedSymbol.key}
-          </p>
-          <p>
-            <strong>Plain meaning:</strong> {selectedSymbol.meaning}
-          </p>
-          <p>
-            <strong>Why it matters:</strong> {selectedSymbol.whyItMatters}
-          </p>
+          {selectedSymbol ? (
+            <>
+              <p>
+                <strong>Selected:</strong> {selectedSymbol.key}
+              </p>
+              <p>
+                <strong>Plain meaning:</strong> {selectedSymbol.meaning}
+              </p>
+              <p>
+                <strong>Why it matters:</strong> {selectedSymbol.whyItMatters}
+              </p>
+            </>
+          ) : (
+            <p>No symbols available in this paper.</p>
+          )}
 
           <h3>Connected Tools (Planned)</h3>
           <ul>
