@@ -1,78 +1,85 @@
+export type FormulaSpan = {
+  id: string;
+  expression: string;
+  source: 'latex' | 'display' | 'equation-line';
+  start: number;
+  end: number;
+};
+
 export type ParsedDocument = {
   title: string;
+  sourceUrl?: string;
   rawText: string;
   contextSnippet: string;
-  equation: string;
-  symbols: Array<{ key: string; meaning: string; whyItMatters: string }>;
-  segments: Array<{ id: string; title: string; text: string; focusPrompt: string }>;
+  formulas: FormulaSpan[];
 };
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function extractEquation(text: string): string {
-  const match = text.match(/[A-Za-z0-9_\s]+=[^\n\.]{1,60}/);
-  return normalizeWhitespace(match?.[0] ?? 'F = m · a');
+function firstNonEmptyLine(text: string): string | undefined {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
 }
 
-function extractSymbols(text: string): ParsedDocument['symbols'] {
-  const uniqueTokens = Array.from(new Set(text.match(/\b[A-Za-z]{1,2}\b/g) ?? []))
-    .map((token) => token.toLowerCase())
-    .filter((token) => !['the', 'of', 'to', 'in', 'is', 'we', 'it', 'as', 'on', 'by', 'an', 'be'].includes(token))
-    .slice(0, 6);
-
-  if (uniqueTokens.length === 0) {
-    return [
-      {
-        key: 'F',
-        meaning: 'A key variable from the uploaded passage.',
-        whyItMatters: 'This symbol appears in the local derivation context and should be interpreted in-place.'
-      }
-    ];
+function deriveTitle(text: string, sourceName: string): string {
+  const line = firstNonEmptyLine(text);
+  if (line && line.length < 140) {
+    return line;
   }
 
-  return uniqueTokens.map((token) => ({
-    key: token,
-    meaning: `Likely notation token extracted from the uploaded document: ${token}.`,
-    whyItMatters: 'Use this as a draft glossary entry and refine meaning with domain-specific context.'
-  }));
+  return sourceName.replace(/\.[^.]+$/, '') || 'Research document';
 }
 
-function buildSegments(text: string): ParsedDocument['segments'] {
-  const sentences = text
-    .split(/(?<=[\.!?])\s+/)
-    .map((entry) => normalizeWhitespace(entry))
-    .filter(Boolean)
-    .slice(0, 3);
+function collectFormulas(text: string): FormulaSpan[] {
+  const formulas: FormulaSpan[] = [];
 
-  if (sentences.length === 0) {
-    return [
-      {
-        id: 'segment-1',
-        title: 'Uploaded document overview',
-        text: 'No readable segments were extracted from this file.',
-        focusPrompt: 'Try uploading a digital PDF or a text-based export.'
-      }
-    ];
+  const pushMatch = (expression: string, start: number, source: FormulaSpan['source']) => {
+    const normalizedExpression = normalizeWhitespace(expression);
+    if (normalizedExpression.length < 4 || normalizedExpression.length > 220) {
+      return;
+    }
+
+    formulas.push({
+      id: `formula-${formulas.length + 1}`,
+      expression: normalizedExpression,
+      source,
+      start,
+      end: start + expression.length
+    });
+  };
+
+  for (const match of text.matchAll(/\$\$(.*?)\$\$/gs)) {
+    if (match.index !== undefined) {
+      pushMatch(match[1] ?? '', match.index, 'display');
+    }
   }
 
-  return sentences.map((sentence, index) => ({
-    id: `segment-${index + 1}`,
-    title: `Document segment ${index + 1}`,
-    text: sentence,
-    focusPrompt: 'What is the claim or assumption in this segment?'
-  }));
-}
-
-function deriveTitle(fileName: string, text: string): string {
-  const firstLine = text.split('\n').map((line) => line.trim()).find(Boolean);
-  if (firstLine && firstLine.length < 120) {
-    return firstLine;
+  for (const match of text.matchAll(/\$(?!\$)([^$\n]+?)\$(?!\$)/g)) {
+    if (match.index !== undefined) {
+      pushMatch(match[1] ?? '', match.index, 'latex');
+    }
   }
-  return fileName.replace(/\.[^.]+$/, '') || 'Uploaded research paper';
-}
 
+  for (const match of text.matchAll(/(?:^|\n)\s*([A-Za-z0-9_\\α-ωΑ-Ω\[\]\(\)\s+\-*/^.,]{3,220}=[^\n]{2,220})/g)) {
+    if (match.index !== undefined) {
+      pushMatch(match[1] ?? '', match.index, 'equation-line');
+    }
+  }
+
+  const deduped = new Map<string, FormulaSpan>();
+  for (const formula of formulas) {
+    const key = formula.expression.toLowerCase();
+    if (!deduped.has(key)) {
+      deduped.set(key, formula);
+    }
+  }
+
+  return [...deduped.values()].slice(0, 40);
+}
 
 async function readTextFile(file: File): Promise<string> {
   if (typeof file.text === 'function') {
@@ -83,41 +90,67 @@ async function readTextFile(file: File): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
-async function extractPdfText(file: File): Promise<string> {
+async function extractPdfTextFromBuffer(bytes: ArrayBuffer): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
-  const bytes = await file.arrayBuffer();
   const loadingTask = pdfjs.getDocument({ data: bytes });
   const doc = await loadingTask.promise;
 
   const pageTexts: string[] = [];
-  const maxPages = Math.min(doc.numPages, 5);
+  const maxPages = Math.min(doc.numPages, 12);
+
   for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
     const page = await doc.getPage(pageNumber);
     const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ');
+    const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
     pageTexts.push(text);
   }
 
-  return normalizeWhitespace(pageTexts.join('\n'));
+  return pageTexts.join('\n');
+}
+
+async function fetchDocumentTextFromUrl(url: string): Promise<string> {
+  const direct = await fetch(url);
+  if (direct.ok) {
+    const contentType = direct.headers.get('content-type') ?? '';
+    if (contentType.includes('application/pdf')) {
+      const bytes = await direct.arrayBuffer();
+      return extractPdfTextFromBuffer(bytes);
+    }
+
+    return direct.text();
+  }
+
+  const cleaned = url.replace(/^https?:\/\//, '');
+  const proxy = await fetch(`https://r.jina.ai/http://${cleaned}`);
+  if (!proxy.ok) {
+    throw new Error(`Failed to fetch URL (${direct.status}) and proxy fallback (${proxy.status}).`);
+  }
+
+  return proxy.text();
+}
+
+function toParsedDocument(rawText: string, sourceName: string, sourceUrl?: string): ParsedDocument {
+  const normalized = normalizeWhitespace(rawText);
+
+  return {
+    title: deriveTitle(rawText, sourceName),
+    sourceUrl,
+    rawText: normalized,
+    contextSnippet: normalized.slice(0, 400) || 'No readable text found in the document.',
+    formulas: collectFormulas(rawText)
+  };
 }
 
 export async function parseResearchDocument(file: File): Promise<ParsedDocument> {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  const rawText = isPdf ? await extractPdfText(file) : normalizeWhitespace(await readTextFile(file));
+  const rawText = isPdf ? await extractPdfTextFromBuffer(await file.arrayBuffer()) : await readTextFile(file);
+  return toParsedDocument(rawText, file.name);
+}
 
-  const normalized = normalizeWhitespace(rawText);
-  const contextSnippet = normalized.slice(0, 320) || 'No text could be extracted from the uploaded file.';
-
-  return {
-    title: deriveTitle(file.name, normalized),
-    rawText: normalized,
-    contextSnippet,
-    equation: extractEquation(normalized),
-    symbols: extractSymbols(normalized),
-    segments: buildSegments(normalized)
-  };
+export async function parseResearchDocumentFromUrl(url: string): Promise<ParsedDocument> {
+  const text = await fetchDocumentTextFromUrl(url);
+  const sourceName = new URL(url).hostname;
+  return toParsedDocument(text, sourceName, url);
 }
